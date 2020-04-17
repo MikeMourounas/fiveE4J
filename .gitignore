@@ -1,0 +1,5 @@
+*.iml
+*.log
+*.class
+.idea
+hs_err_pid*
