@@ -1,6 +1,6 @@
 *.iml
 *.log
 *.class
-.DS_Store
 .idea
 hs_err_pid*
+.DS_Store
