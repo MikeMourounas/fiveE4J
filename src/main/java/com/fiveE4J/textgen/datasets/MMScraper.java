@@ -9,11 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,33 +19,62 @@ import java.util.regex.Pattern;
  * Quick crawler to scrape all monster entries from the 5e srd
  *
  * @author mike
- * todo: generalize the scraping to an abstract class
  * todo: create scrapers for each srd category (eg., items, spells, etc.)
  */
-public class MMScraper {
+public class MMScraper extends BasicCrawler {
     private static final Logger logger = LoggerFactory.getLogger(MMScraper.class);
 
-    /**
-     * List of web pages already scraped
-     */
-    private static List<String> processesPages = new ArrayList<>();
+    private static final String URL = "https://www.5esrd.com/gamemastering/monsters-foes/monsters-by-type/aberrations/aboleth/";
+
+    private static final String OUTPUT_PATH = "src/main/resources/mm_srd_data.txt";
 
     /**
-     * Hash set of monster manual entries from the srd
+     * Set of monster manual entries
      */
-    private static Set<String> entries = new HashSet<>();
+    private Set<String> data;
+
+    // Constructor
+
+    public MMScraper() {
+        super();
+        this.data = new HashSet<>();
+    }
+
+    // Getters & Setters
+
+    public Set<String> getData() { return this.data; }
+
+    // Methods
 
     /**
-     * Has this page been processed already?
+     * Add entry to data field
      *
-     * @param page
-     * @return
+     * @param entry
      */
-    private static boolean isProcessed(String page) {
-        if (processesPages.contains(page))
-            return true;
-        else
-            return false;
+    protected void addEntry(String entry) {
+        this.data.add(entry);
+    }
+
+    /**
+     * Implement abstract writeData method from BasicCrawler
+     *
+     * @param data
+     * @param outputPath
+     * @throws IOException
+     */
+    @Override
+    public void writeData(Collection data, String outputPath) throws IOException {
+        File file = new File(outputPath);
+        FileOutputStream os = new FileOutputStream(file);
+        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8));
+
+        logger.info("Writing monster entries to output file ...");
+
+        for (var entry : data) {
+            writer.write((String) entry);
+            writer.newLine();
+        }
+        writer.close();
     }
 
     /**
@@ -58,7 +85,8 @@ public class MMScraper {
      * @param URL
      * @throws IOException
      */
-    private static void processPage(String URL) throws IOException {
+    @Override
+    public void processPage(String URL) throws IOException {
         // Weird stuff encountered, go back...
         if (URL.contains(".pdf") || URL.contains("@")
                 || URL.contains("adfad") || URL.contains(":80")
@@ -72,7 +100,7 @@ public class MMScraper {
 
         if (!isProcessed(URL)) {
             // Add current URL to list of processed pages
-            processesPages.add(URL);
+            addProcessedURL(URL);
 
             // Attempt to connect to the site via jsoup
             Document doc;
@@ -148,39 +176,25 @@ public class MMScraper {
                         entry.append(text).append("\n\n");
                 }
             }
-            entries.add(entry.toString());
+            addEntry(entry.toString());
 
             Elements questions = doc.select("a[href]");
             for (Element link : questions)
                 processPage(link.attr("abs:href"));
 
-            logger.info("Total entries: " + entries.size());
+            logger.info("Total entries: " + getData().size());
         } else
             return;
     }
 
-    /**
-     * Write entries to text file
-     *
-     * @throws IOException
-     */
-    private static void writeEntries() throws IOException {
-        File file = new File("src/main/resources/mm_srd_data.txt");
-        FileOutputStream os = new FileOutputStream(file);
-        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8));
-
-        logger.info("Writing entries to data file...");
-
-        for (String entry : entries) {
-            writer.write(entry);
-            writer.newLine();
-        }
-        writer.close();
-    }
-
     public static void main(String[] args) throws IOException {
-        String URL = "https://www.5esrd.com/gamemastering/monsters-foes/monsters-by-type/aberrations/aboleth/";
-        processPage(URL);
-        writeEntries();
+        // Simple test script
+        MMScraper scraper = new MMScraper();
+
+        // scrape the srd
+        scraper.processPage(URL);
+
+        // write to file
+        scraper.writeData(scraper.getData(), OUTPUT_PATH);
     }
 }
